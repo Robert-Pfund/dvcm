@@ -1,0 +1,5 @@
+# IDE specifics
+.vscode
+
+# project specifics
+.devcontainer

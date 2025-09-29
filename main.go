@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 )
 
 var ErrHelp = errors.New("flag: help requested")
@@ -65,11 +66,56 @@ func main() {
 
 	switch params["cmd"] {
 	case "load":
-		fmt.Printf("loading from: %s to %s", app.Origin, app.Workspace)
+		fmt.Printf("loading %s from %s to %s\n", app.Name, app.Origin, app.Workspace)
+		app.loadFromLocal()
 	case "save":
-		fmt.Printf("saving from %s to: %s", app.Workspace, app.Origin)
+		fmt.Printf("saving from %s to %s as %s\n", app.Workspace, app.Origin, app.Name)
 	default:
-		fmt.Println("unknown command set: ", params["cmd"])
+		fmt.Println("unknown command set: \n", params["cmd"])
 		os.Exit(1)
+	}
+}
+
+func (app *App) loadFromLocal() {
+
+	source := path.Join(app.Origin, app.Name)
+	target := path.Join(app.Workspace, ".devcontainer")
+
+	fileNames, err := getFilesByNameInDirectory(source)
+	if err != nil {
+		fmt.Printf("failed to get files for source directory: %s", source)
+		os.Exit(1)
+	}
+
+	// TODO: use fileInfo to check if specified target is file/directory
+	_, err = os.Stat(target)
+	if err != nil {
+
+		if !os.IsNotExist(err) {
+
+			fmt.Printf("failed to get fileInfo for target %s: %s\n", target, err)
+			os.Exit(1)
+		} else {
+
+			err = os.Mkdir(target, os.ModeAppend)
+			if err != nil {
+
+				fmt.Printf("failed to create directory for target %s: %s\n", target, err)
+				os.Exit(1)
+			}
+		}
+	}
+
+	for i := range fileNames {
+
+		sourceFile := path.Join(source, fileNames[i])
+		targetFile := path.Join(target, fileNames[i])
+
+		err := os.Link(sourceFile, targetFile)
+		if err != nil {
+
+			fmt.Printf("failed to create hard link: %s\n", err)
+			os.Exit(1)
+		}
 	}
 }
