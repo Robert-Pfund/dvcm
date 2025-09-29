@@ -70,6 +70,7 @@ func main() {
 		app.loadFromLocal()
 	case "save":
 		fmt.Printf("saving from %s to %s as %s\n", app.Workspace, app.Origin, app.Name)
+		app.saveToLocal()
 	default:
 		fmt.Println("unknown command set: \n", params["cmd"])
 		os.Exit(1)
@@ -80,6 +81,19 @@ func (app *App) loadFromLocal() {
 
 	source := path.Join(app.Origin, app.Name)
 	target := path.Join(app.Workspace, ".devcontainer")
+
+	transferFiles(target, source)
+}
+
+func (app *App) saveToLocal() {
+
+	source := path.Join(app.Workspace, ".devcontainer")
+	target := path.Join(app.Origin, app.Name)
+
+	transferFiles(target, source)
+}
+
+func transferFiles(target, source string) {
 
 	fileNames, err := getFilesByNameInDirectory(source)
 	if err != nil {
