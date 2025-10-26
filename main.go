@@ -159,7 +159,7 @@ func (app *App) loadFromRemote() {
 			os.Exit(1)
 		} else {
 
-			err = os.Mkdir(target, os.ModeAppend)
+			err = os.Mkdir(target, os.FileMode(0744))
 			if err != nil {
 
 				fmt.Printf("failed to create directory for target %s: %s\n", target, err)
@@ -183,7 +183,7 @@ func (app *App) loadFromRemote() {
 
 		err = os.WriteFile(path.Join(app.Workspace, ".devcontainer", file.FileName), file.Data, 0666)
 		if err != nil {
-			log.Println("Error writing file")
+			log.Printf("Error writing file: %s\n", err)
 			return
 		}
 	}
@@ -207,7 +207,7 @@ func transferFiles(target, source string) {
 			os.Exit(1)
 		} else {
 
-			err = os.Mkdir(target, os.ModeAppend)
+			err = os.Mkdir(target, 0744)
 			if err != nil {
 
 				fmt.Printf("failed to create directory for target %s: %s\n", target, err)
