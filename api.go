@@ -10,3 +10,8 @@ type GithubResponse struct {
 		Data        []byte
 	} `json:"entries"`
 }
+
+type GithubUploadBody struct {
+	Message string `json:"message"`
+	Content string `json:"content"`
+}

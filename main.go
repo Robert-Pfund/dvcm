@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -81,7 +83,12 @@ func main() {
 		}
 	case "save":
 		fmt.Printf("saving from %s to %s as %s\n", app.Workspace, app.Origin, app.Name)
-		app.saveToLocal()
+		if isRemoteMode {
+			fmt.Println("saving to remote")
+			app.saveToRemote()
+		} else {
+			app.saveToLocal()
+		}
 	default:
 		fmt.Println("unknown command set: \n", params["cmd"])
 		os.Exit(1)
@@ -186,6 +193,75 @@ func (app *App) loadFromRemote() {
 			log.Printf("Error writing file: %s\n", err)
 			return
 		}
+	}
+}
+
+func (app *App) saveToRemote() {
+
+	err := Load()
+	if err != nil {
+		fmt.Printf("failed to load configuration from file: %s\n", err)
+		os.Exit(1)
+	}
+
+	source := path.Join(app.Workspace, ".devcontainer")
+
+	fileNames, err := getFilesByNameInDirectory(source)
+	if err != nil {
+		fmt.Printf("failed to get files for source directory: %s\n", source)
+		os.Exit(1)
+	}
+
+	urlTemplate := "https://api.github.com/repos/%s/%s/contents/%s/%s"
+
+	body := GithubUploadBody{}
+	client := http.Client{}
+
+	for _, filename := range fileNames {
+
+		url := fmt.Sprintf(urlTemplate, Cfg.Github.RepoOwner, Cfg.Github.RepoName, app.Name, filename)
+		body.Message = fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name)
+
+		contentBytes, err := os.ReadFile(path.Join(source, filename))
+		if err != nil {
+			fmt.Printf("failed to read file %s: %s\n", filename, err)
+			os.Exit(1)
+		}
+
+		body.Content = base64.StdEncoding.EncodeToString(contentBytes)
+
+		bodyJSON, err := json.Marshal(body)
+		if err != nil {
+			fmt.Printf("failed to marshal upload data to json: %s\n", err)
+			os.Exit(1)
+		}
+
+		request, err := http.NewRequest(
+			"PUT",
+			url,
+			bytes.NewReader(bodyJSON),
+		)
+		if err != nil {
+			fmt.Printf("failed to build request: %s\n", err)
+			os.Exit(1)
+		}
+
+		request.Header.Add("Accept", "application/vnd.github.object+json")
+		request.Header.Add("X-GitHub-Api-Version", "2022-11-28")
+		request.Header.Add("Authorization", "Bearer "+Cfg.Github.Token)
+
+		resp, err := client.Do(request)
+		if err != nil {
+			fmt.Printf("failed to send create request: %s\n", err)
+			os.Exit(1)
+		}
+
+		if resp.StatusCode != 201 {
+
+			fmt.Printf("failed to create file in remote origin: %s\n", resp.Status)
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
 	}
 }
 
