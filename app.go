@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -41,12 +40,21 @@ func (app *App) loadFromRemote() {
 	if err != nil {
 
 		fmt.Printf("failed to load configuration from file: %s\n", err)
+		os.Exit(1)
 	}
+	Cfg.Name = app.Name
 
 	target := path.Join(app.Workspace, app.DvcFolder)
 
-	urlTemplate := "https://api.github.com/repos/%s/%s/contents/%s"
-	url := fmt.Sprintf(urlTemplate, Cfg.Github.RepoOwner, Cfg.Github.RepoName, app.Name)
+	ghr := new(GithubDownloadResponse)
+	var files []GithubDownloadedFile
+	ghr.Files = files
+
+	ghRepo := &GithubRepository{
+		DownloadResponse: ghr,
+	}
+
+	url := ghRepo.getRepositoryInfoUrl(Cfg)
 
 	request, err := http.NewRequest(
 		"GET",
@@ -59,21 +67,18 @@ func (app *App) loadFromRemote() {
 		os.Exit(1)
 	}
 
-	request.Header.Add("Accept", "application/vnd.github.object+json")
-	request.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-	request.Header.Add("Authorization", "Bearer "+Cfg.Github.Token)
+	ghRepo.addHeaders(*request)
 
 	client := http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
 
 		fmt.Printf("failed to send request to github api: %s\n", err)
+		os.Exit(1)
 	}
 	defer response.Body.Close()
 
-	respContents := &GithubResponse{}
-
-	err = json.NewDecoder(response.Body).Decode(&respContents)
+	err = ghRepo.DownloadResponse.setData(*response)
 	if err != nil {
 
 		fmt.Printf("failed to create a request: %s\n", err)
@@ -99,24 +104,32 @@ func (app *App) loadFromRemote() {
 		}
 	}
 
-	for _, file := range respContents.Files {
+	fileIndex := 0
+	for fileIndex < ghRepo.DownloadResponse.getFileNumber() {
 
-		downloads, err := http.Get(file.DownloadURL)
+		file := ghRepo.DownloadResponse.getFileAtIndex(fileIndex)
+
+		downloads, err := http.Get(file.getUrl())
 		if err != nil {
 			log.Fatalln("Failed to send download request:", err)
 		}
 		defer downloads.Body.Close()
 
-		file.Data, err = io.ReadAll(downloads.Body)
+		var data []byte
+
+		data, err = io.ReadAll(downloads.Body)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		err = os.WriteFile(path.Join(app.Workspace, app.DvcFolder, file.FileName), file.Data, 0666)
+		file.setData(data)
+
+		err = os.WriteFile(path.Join(app.Workspace, app.DvcFolder, file.getFilename()), file.getData(), 0666)
 		if err != nil {
 			log.Printf("Error writing file: %s\n", err)
 			return
 		}
+		fileIndex++
 	}
 }
 
@@ -127,6 +140,7 @@ func (app *App) saveToRemote() {
 		fmt.Printf("failed to load configuration from file: %s\n", err)
 		os.Exit(1)
 	}
+	Cfg.Name = app.Name
 
 	source := path.Join(app.Workspace, app.DvcFolder)
 
@@ -136,15 +150,16 @@ func (app *App) saveToRemote() {
 		os.Exit(1)
 	}
 
-	urlTemplate := "https://api.github.com/repos/%s/%s/contents/%s/%s"
+	ghRepo := &GithubRepository{
+		UploadBody: &GithubUploadBody{},
+	}
 
-	body := GithubUploadBody{}
 	client := http.Client{}
 
 	for _, filename := range fileNames {
 
-		url := fmt.Sprintf(urlTemplate, Cfg.Github.RepoOwner, Cfg.Github.RepoName, app.Name, filename)
-		body.Message = fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name)
+		url := fmt.Sprintf(ghRepo.getRepositoryFileUrl(Cfg), filename)
+		ghRepo.UploadBody.setMessage(fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name))
 
 		contentBytes, err := os.ReadFile(path.Join(source, filename))
 		if err != nil {
@@ -152,9 +167,9 @@ func (app *App) saveToRemote() {
 			os.Exit(1)
 		}
 
-		body.Content = base64.StdEncoding.EncodeToString(contentBytes)
+		ghRepo.UploadBody.setContent(base64.StdEncoding.EncodeToString(contentBytes))
 
-		bodyJSON, err := json.Marshal(body)
+		bodyJSON, err := ghRepo.UploadBody.getJson()
 		if err != nil {
 			fmt.Printf("failed to marshal upload data to json: %s\n", err)
 			os.Exit(1)
@@ -170,9 +185,7 @@ func (app *App) saveToRemote() {
 			os.Exit(1)
 		}
 
-		request.Header.Add("Accept", "application/vnd.github.object+json")
-		request.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-		request.Header.Add("Authorization", "Bearer "+Cfg.Github.Token)
+		ghRepo.addHeaders(*request)
 
 		resp, err := client.Do(request)
 		if err != nil {
