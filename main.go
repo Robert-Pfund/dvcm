@@ -53,11 +53,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	err := Load()
+	if err != nil {
+		fmt.Printf("failed to load configuration from file: %s\n", err)
+		os.Exit(1)
+	}
+
+	Cfg.Name = params["name"]
 	app := App{
 		Workspace: params["workspace"],
 		Origin:    params["origin"],
 		Name:      params["name"],
 		DvcFolder: ".devcontainer",
+		Config:    Cfg,
 	}
 
 	switch params["cmd"] {

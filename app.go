@@ -16,6 +16,7 @@ type App struct {
 	Origin    string
 	Name      string
 	DvcFolder string
+	Config    Config
 }
 
 func (app *App) loadFromLocal() {
@@ -36,26 +37,17 @@ func (app *App) saveToLocal() {
 
 func (app *App) loadFromRemote() {
 
-	err := Load()
-	if err != nil {
-
-		fmt.Printf("failed to load configuration from file: %s\n", err)
-		os.Exit(1)
-	}
-	Cfg.Name = app.Name
-
 	target := path.Join(app.Workspace, app.DvcFolder)
 
-	ghr := new(GithubDownloadResponse)
 	var files []GithubDownloadedFile
-	ghr.Files = files
-
-	ghRepo := &GithubRepository{
-		DownloadResponse: ghr,
+	remoteRepository := &GithubRepository{
+		DownloadResponse: &GithubDownloadResponse{
+			Files: files,
+		},
 	}
+	client := http.Client{}
 
-	url := ghRepo.getRepositoryInfoUrl(Cfg)
-
+	url := remoteRepository.getRepositoryInfoUrl(app.Config)
 	request, err := http.NewRequest(
 		"GET",
 		url,
@@ -66,10 +58,8 @@ func (app *App) loadFromRemote() {
 		fmt.Printf("failed to build request: %s\n", err)
 		os.Exit(1)
 	}
+	remoteRepository.addHeaders(*request)
 
-	ghRepo.addHeaders(*request)
-
-	client := http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
 
@@ -78,7 +68,7 @@ func (app *App) loadFromRemote() {
 	}
 	defer response.Body.Close()
 
-	err = ghRepo.DownloadResponse.setData(*response)
+	err = remoteRepository.DownloadResponse.setData(*response)
 	if err != nil {
 
 		fmt.Printf("failed to create a request: %s\n", err)
@@ -105,23 +95,19 @@ func (app *App) loadFromRemote() {
 	}
 
 	fileIndex := 0
-	for fileIndex < ghRepo.DownloadResponse.getFileNumber() {
+	for fileIndex < remoteRepository.DownloadResponse.getFileNumber() {
 
-		file := ghRepo.DownloadResponse.getFileAtIndex(fileIndex)
-
+		file := remoteRepository.DownloadResponse.getFileAtIndex(fileIndex)
 		downloads, err := http.Get(file.getUrl())
 		if err != nil {
 			log.Fatalln("Failed to send download request:", err)
 		}
 		defer downloads.Body.Close()
 
-		var data []byte
-
-		data, err = io.ReadAll(downloads.Body)
+		data, err := io.ReadAll(downloads.Body)
 		if err != nil {
 			log.Fatal(err)
 		}
-
 		file.setData(data)
 
 		err = os.WriteFile(path.Join(app.Workspace, app.DvcFolder, file.getFilename()), file.getData(), 0666)
@@ -135,31 +121,22 @@ func (app *App) loadFromRemote() {
 
 func (app *App) saveToRemote() {
 
-	err := Load()
-	if err != nil {
-		fmt.Printf("failed to load configuration from file: %s\n", err)
-		os.Exit(1)
-	}
-	Cfg.Name = app.Name
-
 	source := path.Join(app.Workspace, app.DvcFolder)
-
 	fileNames, err := getFilesByNameInDirectory(source)
 	if err != nil {
 		fmt.Printf("failed to get files for source directory: %s\n", source)
 		os.Exit(1)
 	}
 
-	ghRepo := &GithubRepository{
+	remoteRepository := &GithubRepository{
 		UploadBody: &GithubUploadBody{},
 	}
-
 	client := http.Client{}
 
 	for _, filename := range fileNames {
 
-		url := fmt.Sprintf(ghRepo.getRepositoryFileUrl(Cfg), filename)
-		ghRepo.UploadBody.setMessage(fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name))
+		url := fmt.Sprintf(remoteRepository.getRepositoryFileUrl(app.Config), filename)
+		remoteRepository.UploadBody.setMessage(fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name))
 
 		contentBytes, err := os.ReadFile(path.Join(source, filename))
 		if err != nil {
@@ -167,9 +144,8 @@ func (app *App) saveToRemote() {
 			os.Exit(1)
 		}
 
-		ghRepo.UploadBody.setContent(base64.StdEncoding.EncodeToString(contentBytes))
-
-		bodyJSON, err := ghRepo.UploadBody.getJson()
+		remoteRepository.UploadBody.setContent(base64.StdEncoding.EncodeToString(contentBytes))
+		bodyJSON, err := remoteRepository.UploadBody.getJson()
 		if err != nil {
 			fmt.Printf("failed to marshal upload data to json: %s\n", err)
 			os.Exit(1)
@@ -184,8 +160,7 @@ func (app *App) saveToRemote() {
 			fmt.Printf("failed to build request: %s\n", err)
 			os.Exit(1)
 		}
-
-		ghRepo.addHeaders(*request)
+		remoteRepository.addHeaders(*request)
 
 		resp, err := client.Do(request)
 		if err != nil {

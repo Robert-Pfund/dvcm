@@ -8,8 +8,8 @@ import (
 
 type RemoteRepository interface {
 	addHeaders(http.Request) http.Request
-	getRepositoryInfoUrl(Config) string
-	getRepositoryFileUrl(Config) string
+	getRepositoryInfoUrl(Config) string // URL to request general information about contents in repository
+	getRepositoryFileUrl(Config) string // URL to request file contents in repository
 }
 
 type DownloadedFile interface {
