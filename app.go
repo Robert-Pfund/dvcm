@@ -17,6 +17,7 @@ type App struct {
 	Name      string
 	DvcFolder string
 	Config    Config
+	Remote    RemoteRepository
 }
 
 func (app *App) loadFromLocal() {
@@ -128,15 +129,12 @@ func (app *App) saveToRemote() {
 		os.Exit(1)
 	}
 
-	remoteRepository := &GithubRepository{
-		UploadBody: &GithubUploadBody{},
-	}
 	client := http.Client{}
 
 	for _, filename := range fileNames {
 
-		url := fmt.Sprintf(remoteRepository.getRepositoryFileUrl(app.Config), filename)
-		remoteRepository.UploadBody.setMessage(fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name))
+		url := fmt.Sprintf(app.Remote.getRepositoryFileUrl(app.Config), filename)
+		app.Remote.getUploadBody().setMessage(fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name))
 
 		contentBytes, err := os.ReadFile(path.Join(source, filename))
 		if err != nil {
@@ -144,8 +142,8 @@ func (app *App) saveToRemote() {
 			os.Exit(1)
 		}
 
-		remoteRepository.UploadBody.setContent(base64.StdEncoding.EncodeToString(contentBytes))
-		bodyJSON, err := remoteRepository.UploadBody.getJson()
+		app.Remote.getUploadBody().setContent(base64.StdEncoding.EncodeToString(contentBytes))
+		bodyJSON, err := app.Remote.getUploadBody().getJson()
 		if err != nil {
 			fmt.Printf("failed to marshal upload data to json: %s\n", err)
 			os.Exit(1)
@@ -160,7 +158,7 @@ func (app *App) saveToRemote() {
 			fmt.Printf("failed to build request: %s\n", err)
 			os.Exit(1)
 		}
-		remoteRepository.addHeaders(*request)
+		app.Remote.addHeaders(*request)
 
 		resp, err := client.Do(request)
 		if err != nil {

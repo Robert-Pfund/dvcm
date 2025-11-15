@@ -8,6 +8,10 @@ import (
 
 type RemoteRepository interface {
 	addHeaders(http.Request) http.Request
+	getDownloadResponse() RemoteDownloadResponse
+	setDownloadResponse(RemoteDownloadResponse)
+	getUploadBody() RemoteUploadBody
+	setUploadBody(RemoteUploadBody)
 	getRepositoryInfoUrl(Config) string // URL to request general information about contents in repository
 	getRepositoryFileUrl(Config) string // URL to request file contents in repository
 }
@@ -54,6 +58,26 @@ func (repo *GithubRepository) getRepositoryFileUrl(cfg Config) string {
 
 	// add "/%s" for specific file name which is set when looping through files in devcontainer folder
 	return fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", cfg.Github.RepoOwner, cfg.Github.RepoName, cfg.Name) + "/%s"
+}
+
+func (repo *GithubRepository) getUploadBody() RemoteUploadBody {
+
+	return repo.UploadBody
+}
+
+func (repo *GithubRepository) setUploadBody(body RemoteUploadBody) {
+
+	repo.UploadBody = body
+}
+
+func (repo *GithubRepository) getDownloadResponse() RemoteDownloadResponse {
+
+	return repo.DownloadResponse
+}
+
+func (repo *GithubRepository) setDownloadResponse(response RemoteDownloadResponse) {
+
+	repo.DownloadResponse = response
 }
 
 type GithubDownloadedFile struct {

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 )
 
 var ErrHelp = errors.New("flag: help requested")
@@ -24,14 +25,17 @@ func main() {
 
 	params := map[string]string{}
 
+	// parse flags
 	flag.StringVar(&workspace, "workspace", ".", "directory where to load to/save from")
 	flag.StringVar(&origin, "origin", "", "directory where to load from/save to")
 	flag.BoolVar(&isRemoteMode, "r", false, "")
 	flag.Parse()
 
+	// handle flag values
 	params["workspace"] = workspace
 	params["origin"] = origin
 
+	// handle arguments
 	amountOfParams := len(flag.Args())
 	if amountOfParams > 1 && amountOfParams < 3 {
 		params["cmd"] = flag.Arg(0)
@@ -41,31 +45,40 @@ func main() {
 		os.Exit(1)
 	}
 
-	requiredParamNotSet := false
-	for param, value := range params {
-
-		if !(param == "workspace") && value == "" {
-			fmt.Printf("%s has not been set\n", param)
-			requiredParamNotSet = true
-		}
-	}
-	if requiredParamNotSet {
-		os.Exit(1)
-	}
-
+	// load config to use as fall-back values
 	err := Load()
 	if err != nil {
 		fmt.Printf("failed to load configuration from file: %s\n", err)
 		os.Exit(1)
 	}
-
 	Cfg.Name = params["name"]
+
+	var remote RemoteRepository
+	if isRemoteMode {
+		// for now also use github as default case (if no origin is set)
+		if strings.Contains(params["origin"], "github") || params["origin"] == "" {
+
+			var files []GithubDownloadedFile
+			remote = &GithubRepository{
+				DownloadResponse: &GithubDownloadResponse{
+					Files: files,
+				},
+				UploadBody: &GithubUploadBody{},
+			}
+		} else {
+
+			fmt.Printf("found %s to be unknown source for remote origin\n", params["origin"])
+			os.Exit(1)
+		}
+	}
+
 	app := App{
 		Workspace: params["workspace"],
 		Origin:    params["origin"],
 		Name:      params["name"],
 		DvcFolder: ".devcontainer",
 		Config:    Cfg,
+		Remote:    remote,
 	}
 
 	switch params["cmd"] {
