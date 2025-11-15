@@ -56,7 +56,20 @@ func main() {
 	var remote RemoteRepository
 	if isRemoteMode {
 		// for now also use github as default case (if no origin is set)
-		if strings.Contains(params["origin"], "github") || params["origin"] == "" {
+		if strings.Contains(params["origin"], "github") {
+
+			repoOwner, repoName := splitGithubOriginIntoComponents(params["origin"])
+			Cfg.Github.RepoOwner = repoOwner
+			Cfg.Github.RepoName = repoName
+
+			var files []GithubDownloadedFile
+			remote = &GithubRepository{
+				DownloadResponse: &GithubDownloadResponse{
+					Files: files,
+				},
+				UploadBody: &GithubUploadBody{},
+			}
+		} else if params["origin"] == "" {
 
 			var files []GithubDownloadedFile
 			remote = &GithubRepository{
