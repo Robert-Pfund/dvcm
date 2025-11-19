@@ -89,13 +89,25 @@ type GithubDownloadedFile struct {
 	Data        []byte
 }
 
-func (f GithubDownloadedFile) getUrl() string { return f.DownloadURL }
+func (f GithubDownloadedFile) getUrl() string {
 
-func (f GithubDownloadedFile) getData() []byte { return f.Data }
+	return f.DownloadURL
+}
 
-func (f *GithubDownloadedFile) setData(data []byte) { f.Data = data }
+func (f GithubDownloadedFile) getData() []byte {
 
-func (f GithubDownloadedFile) getFilename() string { return f.FileName }
+	return f.Data
+}
+
+func (f *GithubDownloadedFile) setData(data []byte) {
+
+	f.Data = data
+}
+
+func (f GithubDownloadedFile) getFilename() string {
+
+	return f.FileName
+}
 
 type GithubDownloadResponse struct {
 	Files []GithubDownloadedFile `json:"entries"`
@@ -113,7 +125,7 @@ func (ghr GithubDownloadResponse) getFileNumber() int {
 
 func (ghr *GithubDownloadResponse) setData(response http.Response) error {
 
-	err := json.NewDecoder(response.Body).Decode(&ghr) // TODO: make struct be returned instead of interface
+	err := json.NewDecoder(response.Body).Decode(&ghr)
 	if err != nil {
 		return err
 	}
@@ -126,8 +138,17 @@ type GithubUploadBody struct {
 	Content string `json:"content"`
 }
 
-func (b *GithubUploadBody) setMessage(msg string) { b.Message = msg }
+func (b *GithubUploadBody) setMessage(msg string) {
 
-func (b *GithubUploadBody) setContent(content string) { b.Content = content }
+	b.Message = msg
+}
 
-func (b GithubUploadBody) getJson() ([]byte, error) { return json.Marshal(b) }
+func (b *GithubUploadBody) setContent(content string) {
+
+	b.Content = content
+}
+
+func (b GithubUploadBody) getJson() ([]byte, error) {
+
+	return json.Marshal(b)
+}

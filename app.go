@@ -40,15 +40,8 @@ func (app *App) loadFromRemote() {
 
 	target := path.Join(app.Workspace, app.DvcFolder)
 
-	var files []GithubDownloadedFile
-	remoteRepository := &GithubRepository{
-		DownloadResponse: &GithubDownloadResponse{
-			Files: files,
-		},
-	}
 	client := http.Client{}
-
-	url := remoteRepository.getRepositoryInfoUrl(app.Config)
+	url := app.Remote.getRepositoryInfoUrl(app.Config)
 	request, err := http.NewRequest(
 		"GET",
 		url,
@@ -59,7 +52,7 @@ func (app *App) loadFromRemote() {
 		fmt.Printf("failed to build request: %s\n", err)
 		os.Exit(1)
 	}
-	remoteRepository.addHeaders(*request)
+	app.Remote.addHeaders(*request)
 
 	response, err := client.Do(request)
 	if err != nil {
@@ -69,7 +62,7 @@ func (app *App) loadFromRemote() {
 	}
 	defer response.Body.Close()
 
-	err = remoteRepository.DownloadResponse.setData(*response)
+	err = app.Remote.getDownloadResponse().setData(*response)
 	if err != nil {
 
 		fmt.Printf("failed to create a request: %s\n", err)
@@ -96,9 +89,9 @@ func (app *App) loadFromRemote() {
 	}
 
 	fileIndex := 0
-	for fileIndex < remoteRepository.DownloadResponse.getFileNumber() {
+	for fileIndex < app.Remote.getDownloadResponse().getFileNumber() {
 
-		file := remoteRepository.DownloadResponse.getFileAtIndex(fileIndex)
+		file := app.Remote.getDownloadResponse().getFileAtIndex(fileIndex)
 		downloads, err := http.Get(file.getUrl())
 		if err != nil {
 			log.Fatalln("Failed to send download request:", err)
