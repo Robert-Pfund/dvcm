@@ -2,6 +2,11 @@
     "github": {
         "repoowner": "Robert-Pfund",
         "reponame": "devcs",
-        "token": "mysecrettoken"
+        "token": "mysecrettoken1"
+    },
+    "gitlab": {
+        "projectid": "",
+        "branch": "main",
+        "token": "mysecrettoken2"
     }
 }

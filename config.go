@@ -12,6 +12,11 @@ type Config struct {
 		RepoName  string `json:"reponame"`
 		Token     string `json:"token"`
 	} `json:"github"`
+	Gitlab struct {
+		ProjectId string `json:"projectid"`
+		Branch    string `json:"branch"`
+		Token     string `json:"token"`
+	} `json:"gitlab"`
 }
 
 var Cfg Config
