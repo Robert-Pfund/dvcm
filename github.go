@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -28,7 +29,7 @@ func (repo *GithubRepository) getRepositoryInfoUrl(cfg Config) string {
 func (repo *GithubRepository) getRepositoryFileUrl(cfg Config) string {
 
 	// add "/%s" for specific file name which is set when looping through files in devcontainer folder
-	return fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", cfg.Github.RepoOwner, cfg.Github.RepoName, cfg.Name) + "/%s"
+	return fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", cfg.Github.RepoOwner, cfg.Github.RepoName, cfg.Name) + "/"
 }
 
 func (repo *GithubRepository) getUploadBody() RemoteUploadBody {
@@ -119,9 +120,9 @@ func (b *GithubUploadBody) setMessage(msg string) {
 	b.Message = msg
 }
 
-func (b *GithubUploadBody) setContent(content string) {
+func (b *GithubUploadBody) setContent(content []byte) {
 
-	b.Content = content
+	b.Content = base64.StdEncoding.EncodeToString(content)
 }
 
 func (b GithubUploadBody) getJson() ([]byte, error) {

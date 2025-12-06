@@ -30,6 +30,6 @@ type RemoteDownloadResponse interface {
 
 type RemoteUploadBody interface {
 	setMessage(string)
-	setContent(string)
+	setContent([]byte)
 	getJson() ([]byte, error)
 }

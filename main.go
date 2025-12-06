@@ -69,6 +69,18 @@ func main() {
 				},
 				UploadBody: &GithubUploadBody{},
 			}
+		} else if strings.Contains(params["origin"], "gitlab") {
+
+			projectId := splitGitlabOriginIntoComponents(params["origin"])
+			Cfg.Gitlab.ProjectId = projectId
+
+			var files []GitlabDownloadedFile
+			remote = &GitlabRepository{
+				DownloadResponse: &GitlabDownloadResponse{
+					Files: files,
+				},
+				UploadBody: &GitlabUploadBody{},
+			}
 		} else if params["origin"] == "" {
 
 			var files []GithubDownloadedFile

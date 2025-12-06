@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -126,7 +125,7 @@ func (app *App) saveToRemote() {
 
 	for _, filename := range fileNames {
 
-		url := fmt.Sprintf(app.Remote.getRepositoryFileUrl(app.Config), filename)
+		url := fmt.Sprint(app.Remote.getRepositoryFileUrl(app.Config), filename)
 		app.Remote.getUploadBody().setMessage(fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name))
 
 		contentBytes, err := os.ReadFile(path.Join(source, filename))
@@ -135,7 +134,7 @@ func (app *App) saveToRemote() {
 			os.Exit(1)
 		}
 
-		app.Remote.getUploadBody().setContent(base64.StdEncoding.EncodeToString(contentBytes))
+		app.Remote.getUploadBody().setContent(contentBytes)
 		bodyJSON, err := app.Remote.getUploadBody().getJson()
 		if err != nil {
 			fmt.Printf("failed to marshal upload data to json: %s\n", err)
@@ -143,7 +142,7 @@ func (app *App) saveToRemote() {
 		}
 
 		request, err := http.NewRequest(
-			"PUT",
+			app.Remote.getFileUploadHttpMethod(),
 			url,
 			bytes.NewReader(bodyJSON),
 		)
