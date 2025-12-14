@@ -118,17 +118,9 @@ func (glr GitlabDownloadResponse) getFileNumber() int {
 
 func (glr *GitlabDownloadResponse) setData(response http.Response) error {
 
-	// TODO: check why decoding to &glr fails
-	type TemporaryDownloadReponse []GitlabDownloadedFile
-	var downloadResponse TemporaryDownloadReponse
-
-	err := json.NewDecoder(response.Body).Decode(&downloadResponse)
+	err := json.NewDecoder(response.Body).Decode(&glr.Files)
 	if err != nil {
 		return err
-	}
-
-	for _, file := range downloadResponse {
-		glr.Files = append(glr.Files, file)
 	}
 
 	return nil
