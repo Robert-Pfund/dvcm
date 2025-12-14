@@ -18,7 +18,7 @@ type RemoteRepository interface {
 type DownloadedFile interface {
 	getUrl() string
 	getData() []byte
-	setData([]byte)
+	setData([]byte) error
 	getFilename() string
 }
 

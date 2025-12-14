@@ -76,9 +76,10 @@ func (f GithubDownloadedFile) getData() []byte {
 	return f.Data
 }
 
-func (f *GithubDownloadedFile) setData(data []byte) {
+func (f *GithubDownloadedFile) setData(data []byte) error {
 
 	f.Data = data
+	return nil
 }
 
 func (f GithubDownloadedFile) getFilename() string {

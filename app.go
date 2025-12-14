@@ -99,9 +99,15 @@ func (app *App) loadFromRemote() {
 
 		data, err := io.ReadAll(downloads.Body)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Printf("failed to read response body for %s: %s\n", file.getFilename(), err)
+			os.Exit(1)
 		}
-		file.setData(data)
+
+		err = file.setData(data)
+		if err != nil {
+			fmt.Printf("failed to set file data for %s: %s\n", file.getFilename(), err)
+			os.Exit(1)
+		}
 
 		err = os.WriteFile(path.Join(app.Workspace, app.DvcFolder, file.getFilename()), file.getData(), 0666)
 		if err != nil {
