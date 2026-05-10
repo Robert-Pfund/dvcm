@@ -1,4 +1,5 @@
 {
+    "default_remote": "github",
     "github": {
         "repoowner": "Robert-Pfund",
         "reponame": "devcs",

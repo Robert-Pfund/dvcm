@@ -56,7 +56,7 @@ func (app *App) loadFromRemote() {
 	response, err := client.Do(request)
 	if err != nil {
 
-		fmt.Printf("failed to send request to github api: %s\n", err)
+		fmt.Printf("failed to send request to remote api: %s\n", err)
 		os.Exit(1)
 	}
 	defer response.Body.Close()

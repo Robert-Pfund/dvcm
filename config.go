@@ -6,8 +6,9 @@ import (
 )
 
 type Config struct {
-	Name   string
-	Github struct {
+	Name    string
+	Default string `json:"default_remote"`
+	Github  struct {
 		RepoOwner string `json:"repoowner"`
 		RepoName  string `json:"reponame"`
 		Token     string `json:"token"`

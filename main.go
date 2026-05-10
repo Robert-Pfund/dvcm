@@ -28,7 +28,7 @@ func main() {
 	// parse flags
 	flag.StringVar(&workspace, "workspace", ".", "directory where to load to/save from")
 	flag.StringVar(&origin, "origin", "", "directory where to load from/save to")
-	flag.BoolVar(&isRemoteMode, "r", false, "")
+	flag.BoolVar(&isRemoteMode, "r", false, "toggle remote mode")
 	flag.Parse()
 
 	// handle flag values
@@ -81,7 +81,7 @@ func main() {
 				},
 				UploadBody: &GitlabUploadBody{},
 			}
-		} else if params["origin"] == "" {
+		} else if params["origin"] == "" && Cfg.Default == "github" {
 
 			var files []GithubDownloadedFile
 			remote = &GithubRepository{
@@ -89,6 +89,15 @@ func main() {
 					Files: files,
 				},
 				UploadBody: &GithubUploadBody{},
+			}
+		} else if params["origins"] == "" && Cfg.Default == "gitlab" {
+
+			var files []GitlabDownloadedFile
+			remote = &GitlabRepository{
+				DownloadResponse: &GitlabDownloadResponse{
+					Files: files,
+				},
+				UploadBody: &GitlabUploadBody{},
 			}
 		} else {
 
