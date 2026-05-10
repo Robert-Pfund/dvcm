@@ -6,11 +6,18 @@ import (
 )
 
 type Config struct {
-	Github struct {
+	Name    string
+	Default string `json:"default_remote"`
+	Github  struct {
 		RepoOwner string `json:"repoowner"`
 		RepoName  string `json:"reponame"`
 		Token     string `json:"token"`
 	} `json:"github"`
+	Gitlab struct {
+		ProjectId string `json:"projectid"`
+		Branch    string `json:"branch"`
+		Token     string `json:"token"`
+	} `json:"gitlab"`
 }
 
 var Cfg Config

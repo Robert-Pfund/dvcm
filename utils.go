@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 )
 
 func getFilesByNameInDirectory(directory string) ([]string, error) {
@@ -66,4 +67,22 @@ func transferFilesBetweenDirectories(target, source string) {
 			os.Exit(1)
 		}
 	}
+}
+
+// expecting url like "https://github.com/Robert-Pfund/devcs"
+func splitGithubOriginIntoComponents(origin string) (string, string) {
+
+	components := strings.Split(origin, "/")
+	repoOwner := components[len(components)-2]
+	repoName := components[len(components)-1]
+
+	return repoOwner, repoName
+}
+
+func splitGitlabOriginIntoComponents(origin string) string {
+
+	// expecting url like "https://gitlab.com/api/v4/projects/:id"
+	components := strings.Split(origin, "/")
+	projectId := components[len(components)-1]
+	return projectId
 }

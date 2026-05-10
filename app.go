@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -17,6 +15,8 @@ type App struct {
 	Origin    string
 	Name      string
 	DvcFolder string
+	Config    Config
+	Remote    RemoteRepository
 }
 
 func (app *App) loadFromLocal() {
@@ -37,17 +37,10 @@ func (app *App) saveToLocal() {
 
 func (app *App) loadFromRemote() {
 
-	err := Load()
-	if err != nil {
-
-		fmt.Printf("failed to load configuration from file: %s\n", err)
-	}
-
 	target := path.Join(app.Workspace, app.DvcFolder)
 
-	urlTemplate := "https://api.github.com/repos/%s/%s/contents/%s"
-	url := fmt.Sprintf(urlTemplate, Cfg.Github.RepoOwner, Cfg.Github.RepoName, app.Name)
-
+	client := http.Client{}
+	url := app.Remote.getRepositoryInfoUrl(app.Config)
 	request, err := http.NewRequest(
 		"GET",
 		url,
@@ -58,22 +51,17 @@ func (app *App) loadFromRemote() {
 		fmt.Printf("failed to build request: %s\n", err)
 		os.Exit(1)
 	}
+	app.Remote.addHeaders(*request)
 
-	request.Header.Add("Accept", "application/vnd.github.object+json")
-	request.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-	request.Header.Add("Authorization", "Bearer "+Cfg.Github.Token)
-
-	client := http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
 
-		fmt.Printf("failed to send request to github api: %s\n", err)
+		fmt.Printf("failed to send request to remote api: %s\n", err)
+		os.Exit(1)
 	}
 	defer response.Body.Close()
 
-	respContents := &GithubResponse{}
-
-	err = json.NewDecoder(response.Body).Decode(&respContents)
+	err = app.Remote.getDownloadResponse().setData(*response)
 	if err != nil {
 
 		fmt.Printf("failed to create a request: %s\n", err)
@@ -99,52 +87,52 @@ func (app *App) loadFromRemote() {
 		}
 	}
 
-	for _, file := range respContents.Files {
+	fileIndex := 0
+	for fileIndex < app.Remote.getDownloadResponse().getFileNumber() {
 
-		downloads, err := http.Get(file.DownloadURL)
+		file := app.Remote.getDownloadResponse().getFileAtIndex(fileIndex)
+		downloads, err := http.Get(file.getUrl())
 		if err != nil {
 			log.Fatalln("Failed to send download request:", err)
 		}
 		defer downloads.Body.Close()
 
-		file.Data, err = io.ReadAll(downloads.Body)
+		data, err := io.ReadAll(downloads.Body)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Printf("failed to read response body for %s: %s\n", file.getFilename(), err)
+			os.Exit(1)
 		}
 
-		err = os.WriteFile(path.Join(app.Workspace, app.DvcFolder, file.FileName), file.Data, 0666)
+		err = file.setData(data)
+		if err != nil {
+			fmt.Printf("failed to set file data for %s: %s\n", file.getFilename(), err)
+			os.Exit(1)
+		}
+
+		err = os.WriteFile(path.Join(app.Workspace, app.DvcFolder, file.getFilename()), file.getData(), 0666)
 		if err != nil {
 			log.Printf("Error writing file: %s\n", err)
 			return
 		}
+		fileIndex++
 	}
 }
 
 func (app *App) saveToRemote() {
 
-	err := Load()
-	if err != nil {
-		fmt.Printf("failed to load configuration from file: %s\n", err)
-		os.Exit(1)
-	}
-
 	source := path.Join(app.Workspace, app.DvcFolder)
-
 	fileNames, err := getFilesByNameInDirectory(source)
 	if err != nil {
 		fmt.Printf("failed to get files for source directory: %s\n", source)
 		os.Exit(1)
 	}
 
-	urlTemplate := "https://api.github.com/repos/%s/%s/contents/%s/%s"
-
-	body := GithubUploadBody{}
 	client := http.Client{}
 
 	for _, filename := range fileNames {
 
-		url := fmt.Sprintf(urlTemplate, Cfg.Github.RepoOwner, Cfg.Github.RepoName, app.Name, filename)
-		body.Message = fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name)
+		url := fmt.Sprint(app.Remote.getRepositoryFileUrl(app.Config), filename)
+		app.Remote.getUploadBody().setMessage(fmt.Sprintf("uploading contents of file: %s in config for %s\n", filename, app.Name))
 
 		contentBytes, err := os.ReadFile(path.Join(source, filename))
 		if err != nil {
@@ -152,16 +140,15 @@ func (app *App) saveToRemote() {
 			os.Exit(1)
 		}
 
-		body.Content = base64.StdEncoding.EncodeToString(contentBytes)
-
-		bodyJSON, err := json.Marshal(body)
+		app.Remote.getUploadBody().setContent(contentBytes)
+		bodyJSON, err := app.Remote.getUploadBody().getJson()
 		if err != nil {
 			fmt.Printf("failed to marshal upload data to json: %s\n", err)
 			os.Exit(1)
 		}
 
 		request, err := http.NewRequest(
-			"PUT",
+			app.Remote.getFileUploadHttpMethod(),
 			url,
 			bytes.NewReader(bodyJSON),
 		)
@@ -169,10 +156,7 @@ func (app *App) saveToRemote() {
 			fmt.Printf("failed to build request: %s\n", err)
 			os.Exit(1)
 		}
-
-		request.Header.Add("Accept", "application/vnd.github.object+json")
-		request.Header.Add("X-GitHub-Api-Version", "2022-11-28")
-		request.Header.Add("Authorization", "Bearer "+Cfg.Github.Token)
+		app.Remote.addHeaders(*request)
 
 		resp, err := client.Do(request)
 		if err != nil {

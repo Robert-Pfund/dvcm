@@ -1,17 +1,35 @@
 package main
 
-type GithubResponse struct {
-	Files []struct {
-		FileName    string `json:"name"`
-		Path        string `json:"path"`
-		Type        string `json:"type"`
-		Sha         string `json:"sha"`
-		DownloadURL string `json:"download_url"`
-		Data        []byte
-	} `json:"entries"`
+import (
+	"net/http"
+)
+
+type RemoteRepository interface {
+	addHeaders(http.Request) http.Request
+	getDownloadResponse() RemoteDownloadResponse
+	setDownloadResponse(RemoteDownloadResponse)
+	getUploadBody() RemoteUploadBody
+	setUploadBody(RemoteUploadBody)
+	getRepositoryInfoUrl(Config) string // URL to request general information about contents in repository
+	getRepositoryFileUrl(Config) string // URL to request file contents in repository
+	getFileUploadHttpMethod() string
 }
 
-type GithubUploadBody struct {
-	Message string `json:"message"`
-	Content string `json:"content"`
+type DownloadedFile interface {
+	getUrl() string
+	getData() []byte
+	setData([]byte) error
+	getFilename() string
+}
+
+type RemoteDownloadResponse interface {
+	getFileAtIndex(int) DownloadedFile
+	getFileNumber() int
+	setData(http.Response) error
+}
+
+type RemoteUploadBody interface {
+	setMessage(string)
+	setContent([]byte)
+	getJson() ([]byte, error)
 }
