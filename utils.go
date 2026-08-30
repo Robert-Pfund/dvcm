@@ -79,9 +79,9 @@ func splitGithubOriginIntoComponents(origin string) (string, string) {
 	return repoOwner, repoName
 }
 
+// expecting url like "https://gitlab.com/api/v4/projects/:id"
 func splitGitlabOriginIntoComponents(origin string) string {
 
-	// expecting url like "https://gitlab.com/api/v4/projects/:id"
 	components := strings.Split(origin, "/")
 	projectId := components[len(components)-1]
 	return projectId
