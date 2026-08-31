@@ -28,12 +28,12 @@ func getFilesByNameInDirectory(directory string) ([]string, error) {
 	return fileNames, nil
 }
 
-func transferFilesBetweenDirectories(target, source string) {
+func transferFilesBetweenDirectories(target, source string) error {
 
 	fileNames, err := getFilesByNameInDirectory(source)
 	if err != nil {
-		fmt.Printf("failed to get files for source directory: %s\n", source)
-		os.Exit(1)
+
+		return fmt.Errorf("failed to get files for source directory: %s\n", source)
 	}
 
 	// TODO: use fileInfo to check if specified target is file/directory
@@ -42,15 +42,14 @@ func transferFilesBetweenDirectories(target, source string) {
 
 		if !os.IsNotExist(err) {
 
-			fmt.Printf("failed to get fileInfo for target %s: %s\n", target, err)
-			os.Exit(1)
+			return fmt.Errorf("failed to get fileInfo for target %s: %s\n", target, err)
+
 		} else {
 
 			err = os.Mkdir(target, 0744)
 			if err != nil {
 
-				fmt.Printf("failed to create directory for target %s: %s\n", target, err)
-				os.Exit(1)
+				return fmt.Errorf("failed to create directory for target %s: %s\n", target, err)
 			}
 		}
 	}
@@ -63,10 +62,11 @@ func transferFilesBetweenDirectories(target, source string) {
 		err := os.Link(sourceFile, targetFile)
 		if err != nil {
 
-			fmt.Printf("failed to create hard link: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to create hard link for %s: %s\n", sourceFile, err)
 		}
 	}
+
+	return nil
 }
 
 // expecting url like "https://github.com/Robert-Pfund/devcs"
