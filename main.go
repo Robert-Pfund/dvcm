@@ -44,17 +44,16 @@ func (r *runtimeConfig) verifyCmd() error {
 // for now only check if given origin input is link to http resource and if host is either github or gitlab
 func (r *runtimeConfig) verifyOrigin() error {
 
-	if strings.Contains(r.origin, "http") {
+	if r.origin == "" {
+		return nil
+	}
 
-		for _, knownOrigin := range knownRemoteOrigins {
+	if strings.Contains(r.origin, "github") || strings.Contains(r.origin, "gitlab") {
+		return nil
+	}
 
-			if strings.Contains(r.origin, knownOrigin) {
-
-				return nil
-			}
-		}
-
-		return fmt.Errorf("received unknown origin (%s) - currently supported remote origins: %v", r.cmd, knownRemoteOrigins)
+	if r.isRemoteMode {
+		return fmt.Errorf("received unknown origin (%s) - currently supported remote origins: %v", r.origin, knownRemoteOrigins)
 	}
 
 	return nil
@@ -201,22 +200,21 @@ func parseArgs(args []string, isRemoteMode bool) (runtimeConfig, error) {
 
 	runtime.workspace = args[0]
 	runtime.origin = args[1]
+
+	runtime.isRemoteMode = isRemoteMode
+
 	err := runtime.verifyOrigin()
 	if err != nil {
-
 		return runtime, err
 	}
 
 	runtime.cmd = args[2]
 	err = runtime.verifyCmd()
 	if err != nil {
-
 		return runtime, err
 	}
 
 	runtime.name = args[3]
-
-	runtime.isRemoteMode = isRemoteMode
 
 	return runtime, nil
 }
