@@ -17,6 +17,7 @@ var Usage = func() {
 }
 
 const defaultFolderName string = ".devcontainer"
+const defaultConfigFileName string = "config.json"
 const expectedArguments int = 4
 
 var knownCmds = []string{"load", "save"}
@@ -35,7 +36,6 @@ func (r *runtimeConfig) verifyCmd() error {
 	if !slices.Contains(knownCmds, r.cmd) {
 
 		return fmt.Errorf("received unexpected command (%s) - not in known commands: %v", r.cmd, knownCmds)
-
 	}
 
 	return nil
@@ -95,9 +95,13 @@ func main() {
 	},
 		isRemoteMode,
 	)
+	if err != nil {
+		fmt.Printf("failed to parse arguments: %s\n", err)
+		os.Exit(1)
+	}
 
 	// load config to use as fall-back values
-	err = Load()
+	err = Load(defaultConfigFileName)
 	if err != nil {
 		fmt.Printf("failed to load configuration from file: %s\n", err)
 		os.Exit(1)

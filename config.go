@@ -22,8 +22,8 @@ type Config struct {
 
 var Cfg Config
 
-func Load() (err error) {
-	rawData, err := os.ReadFile("config.json")
+func Load(configFile string) (err error) {
+	rawData, err := os.ReadFile(configFile)
 	if err != nil {
 		return
 	}
