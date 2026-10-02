@@ -135,6 +135,11 @@ func buildApp(runtimeCfg runtimeConfig, cfg Config) (App, error) {
 
 			remote = getGithubConfig()
 
+			err := validateGithubConfig(cfg)
+			if err != nil {
+				return App{}, err
+			}
+
 		} else if strings.Contains(runtimeCfg.origin, "gitlab") {
 
 			projectId := splitGitlabOriginIntoComponents(runtimeCfg.origin)
@@ -142,14 +147,28 @@ func buildApp(runtimeCfg runtimeConfig, cfg Config) (App, error) {
 
 			remote = getGitlabConfig()
 
+			err := validateGitlabConfig(cfg)
+			if err != nil {
+				return App{}, err
+			}
+
 		} else if runtimeCfg.origin == "" && cfg.Default == "github" {
 
 			remote = getGithubConfig()
+
+			err := validateGithubConfig(cfg)
+			if err != nil {
+				return App{}, err
+			}
 
 		} else if runtimeCfg.origin == "" && cfg.Default == "gitlab" {
 
 			remote = getGitlabConfig()
 
+			err := validateGitlabConfig(cfg)
+			if err != nil {
+				return App{}, err
+			}
 		} else {
 			return App{}, fmt.Errorf("found %s to be unknown source for remote origin\n", runtimeCfg.origin)
 		}

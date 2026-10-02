@@ -38,6 +38,13 @@ func Test_buildApp(t *testing.T) {
 				cmd:          "load",
 				name:         "devcontainer",
 			},
+			cfg: Config{
+				Github: struct {
+					RepoOwner string `json:"repoowner"`
+					RepoName  string `json:"reponame"`
+					Token     string `json:"token"`
+				}{Token: "test-token"},
+			},
 			want: App{
 				Workspace: "/tmp/workspace",
 				Origin:    "https://github.com/acme/docs",
@@ -56,6 +63,13 @@ func Test_buildApp(t *testing.T) {
 				isRemoteMode: true,
 				cmd:          "save",
 				name:         "devcontainer",
+			},
+			cfg: Config{
+				Gitlab: struct {
+					ProjectId string `json:"projectid"`
+					Branch    string `json:"branch"`
+					Token     string `json:"token"`
+				}{Branch: "main", Token: "test-token"},
 			},
 			want: App{
 				Workspace: "/tmp/workspace",
@@ -88,6 +102,11 @@ func Test_buildApp(t *testing.T) {
 			},
 			cfg: Config{
 				Default: "github",
+				Github: struct {
+					RepoOwner string `json:"repoowner"`
+					RepoName  string `json:"reponame"`
+					Token     string `json:"token"`
+				}{RepoOwner: "acme", RepoName: "docs", Token: "test-token"},
 			},
 			want: App{
 				Workspace: "/tmp/workspace",
@@ -96,6 +115,73 @@ func Test_buildApp(t *testing.T) {
 				DvcFolder: defaultFolderName,
 			},
 			wantRemote: "github",
+			wantOwner:  "acme",
+			wantRepo:   "docs",
+		},
+		{
+			name: "remote github origin rejects missing token",
+			runtimeCfg: runtimeConfig{
+				workspace:    "/tmp/workspace",
+				origin:       "https://github.com/acme/docs",
+				isRemoteMode: true,
+				cmd:          "load",
+				name:         "devcontainer",
+			},
+			wantErr: true,
+		},
+		{
+			name: "remote gitlab origin rejects missing token",
+			runtimeCfg: runtimeConfig{
+				workspace:    "/tmp/workspace",
+				origin:       "https://gitlab.com/api/v4/projects/10312419",
+				isRemoteMode: true,
+				cmd:          "load",
+				name:         "devcontainer",
+			},
+			cfg: Config{
+				Gitlab: struct {
+					ProjectId string `json:"projectid"`
+					Branch    string `json:"branch"`
+					Token     string `json:"token"`
+				}{Branch: "main"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "default github rejects missing token",
+			runtimeCfg: runtimeConfig{
+				workspace:    "/tmp/workspace",
+				isRemoteMode: true,
+				cmd:          "load",
+				name:         "devcontainer",
+			},
+			cfg: Config{
+				Default: "github",
+				Github: struct {
+					RepoOwner string `json:"repoowner"`
+					RepoName  string `json:"reponame"`
+					Token     string `json:"token"`
+				}{RepoOwner: "acme", RepoName: "docs"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "default gitlab rejects missing token",
+			runtimeCfg: runtimeConfig{
+				workspace:    "/tmp/workspace",
+				isRemoteMode: true,
+				cmd:          "load",
+				name:         "devcontainer",
+			},
+			cfg: Config{
+				Default: "gitlab",
+				Gitlab: struct {
+					ProjectId string `json:"projectid"`
+					Branch    string `json:"branch"`
+					Token     string `json:"token"`
+				}{ProjectId: "10312419", Branch: "main"},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
