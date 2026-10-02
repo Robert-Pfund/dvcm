@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -19,23 +18,35 @@ type App struct {
 	Remote    RemoteRepository
 }
 
-func (app *App) loadFromLocal() {
+func (app *App) loadFromLocal() error {
 
 	source := path.Join(app.Origin, app.Name)
 	target := path.Join(app.Workspace, app.DvcFolder)
 
-	transferFilesBetweenDirectories(target, source)
+	err := transferFilesBetweenDirectories(target, source)
+	if err != nil {
+
+		return err
+	}
+
+	return nil
 }
 
-func (app *App) saveToLocal() {
+func (app *App) saveToLocal() error {
 
 	source := path.Join(app.Workspace, app.DvcFolder)
 	target := path.Join(app.Origin, app.Name)
 
-	transferFilesBetweenDirectories(target, source)
+	err := transferFilesBetweenDirectories(target, source)
+	if err != nil {
+
+		return err
+	}
+
+	return nil
 }
 
-func (app *App) loadFromRemote() {
+func (app *App) loadFromRemote() error {
 
 	target := path.Join(app.Workspace, app.DvcFolder)
 
@@ -48,24 +59,21 @@ func (app *App) loadFromRemote() {
 	)
 	if err != nil {
 
-		fmt.Printf("failed to build request: %s\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to build request: %s\n", err)
 	}
 	app.Remote.addHeaders(*request)
 
 	response, err := client.Do(request)
 	if err != nil {
 
-		fmt.Printf("failed to send request to remote api: %s\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to send request to remote api: %s\n", err)
 	}
 	defer response.Body.Close()
 
 	err = app.Remote.getDownloadResponse().setData(*response)
 	if err != nil {
 
-		fmt.Printf("failed to create a request: %s\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create a request: %s\n", err)
 	}
 
 	// TODO: use fileInfo to check if specified target is file/directory
@@ -74,15 +82,13 @@ func (app *App) loadFromRemote() {
 
 		if !os.IsNotExist(err) {
 
-			fmt.Printf("failed to get fileInfo for target %s: %s\n", target, err)
-			os.Exit(1)
+			return fmt.Errorf("failed to get fileInfo for target %s: %s\n", target, err)
 		} else {
 
 			err = os.Mkdir(target, os.FileMode(0744))
 			if err != nil {
 
-				fmt.Printf("failed to create directory for target %s: %s\n", target, err)
-				os.Exit(1)
+				return fmt.Errorf("failed to create directory for target %s: %s\n", target, err)
 			}
 		}
 	}
@@ -93,38 +99,40 @@ func (app *App) loadFromRemote() {
 		file := app.Remote.getDownloadResponse().getFileAtIndex(fileIndex)
 		downloads, err := http.Get(file.getUrl())
 		if err != nil {
-			log.Fatalln("Failed to send download request:", err)
+
+			return fmt.Errorf("Failed to send download request: %s\n", err)
 		}
 		defer downloads.Body.Close()
 
 		data, err := io.ReadAll(downloads.Body)
 		if err != nil {
-			fmt.Printf("failed to read response body for %s: %s\n", file.getFilename(), err)
-			os.Exit(1)
+
+			return fmt.Errorf("failed to read response body for %s: %s\n", file.getFilename(), err)
 		}
 
 		err = file.setData(data)
 		if err != nil {
-			fmt.Printf("failed to set file data for %s: %s\n", file.getFilename(), err)
-			os.Exit(1)
+
+			return fmt.Errorf("failed to set file data for %s: %s\n", file.getFilename(), err)
 		}
 
 		err = os.WriteFile(path.Join(app.Workspace, app.DvcFolder, file.getFilename()), file.getData(), 0666)
 		if err != nil {
-			log.Printf("Error writing file: %s\n", err)
-			return
+
+			return fmt.Errorf("Error writing file: %s\n", err)
 		}
 		fileIndex++
 	}
+
+	return nil
 }
 
-func (app *App) saveToRemote() {
+func (app *App) saveToRemote() error {
 
 	source := path.Join(app.Workspace, app.DvcFolder)
 	fileNames, err := getFilesByNameInDirectory(source)
 	if err != nil {
-		fmt.Printf("failed to get files for source directory: %s\n", source)
-		os.Exit(1)
+		return fmt.Errorf("failed to get files for source directory: %s\n", source)
 	}
 
 	client := http.Client{}
@@ -136,15 +144,14 @@ func (app *App) saveToRemote() {
 
 		contentBytes, err := os.ReadFile(path.Join(source, filename))
 		if err != nil {
-			fmt.Printf("failed to read file %s: %s\n", filename, err)
-			os.Exit(1)
+
+			return fmt.Errorf("failed to read file %s: %s\n", filename, err)
 		}
 
 		app.Remote.getUploadBody().setContent(contentBytes)
 		bodyJSON, err := app.Remote.getUploadBody().getJson()
 		if err != nil {
-			fmt.Printf("failed to marshal upload data to json: %s\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to marshal upload data to json: %s\n", err)
 		}
 
 		request, err := http.NewRequest(
@@ -153,22 +160,23 @@ func (app *App) saveToRemote() {
 			bytes.NewReader(bodyJSON),
 		)
 		if err != nil {
-			fmt.Printf("failed to build request: %s\n", err)
-			os.Exit(1)
+
+			return fmt.Errorf("failed to build request: %s\n", err)
 		}
 		app.Remote.addHeaders(*request)
 
 		resp, err := client.Do(request)
 		if err != nil {
-			fmt.Printf("failed to send create request: %s\n", err)
-			os.Exit(1)
+
+			return fmt.Errorf("failed to send create request: %s\n", err)
 		}
 
 		if resp.StatusCode != 201 {
 
-			fmt.Printf("failed to create file in remote origin: %s\n", resp.Status)
-			os.Exit(1)
+			return fmt.Errorf("failed to create file in remote origin: %s\n", resp.Status)
 		}
 		defer resp.Body.Close()
 	}
+
+	return nil
 }

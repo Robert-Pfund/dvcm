@@ -1,0 +1,13 @@
+{
+    "default_remote": "github",
+    "github": {
+        "repoowner": "my_testuser",
+        "reponame": "my_testrepo",
+        "token": "my_secrettoken1"
+    },
+    "gitlab": {
+        "projectid": "11111141",
+        "branch": "main",
+        "token": "my_secrettoken2"
+    }
+}

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -15,15 +16,59 @@ var Usage = func() {
 	flag.PrintDefaults()
 }
 
+const defaultFolderName string = ".devcontainer"
+const defaultConfigFileName string = "config.json"
+const expectedArguments int = 4
+
+var knownCmds = []string{"load", "save"}
+var knownRemoteOrigins = []string{"github", "gitlab"}
+
+type runtimeConfig struct {
+	workspace    string
+	origin       string
+	isRemoteMode bool
+	cmd          string
+	name         string
+}
+
+func (r *runtimeConfig) verifyCmd() error {
+
+	if !slices.Contains(knownCmds, r.cmd) {
+
+		return fmt.Errorf("received unexpected command (%s) - not in known commands: %v", r.cmd, knownCmds)
+	}
+
+	return nil
+}
+
+// for now only check if given origin input is link to http resource and if host is either github or gitlab
+func (r *runtimeConfig) verifyOrigin() error {
+
+	if r.origin == "" {
+		return nil
+	}
+
+	if strings.Contains(r.origin, "github") || strings.Contains(r.origin, "gitlab") {
+		return nil
+	}
+
+	if r.isRemoteMode {
+		return fmt.Errorf("received unknown origin (%s) - currently supported remote origins: %v", r.origin, knownRemoteOrigins)
+	}
+
+	return nil
+}
+
 func main() {
 
 	var (
 		workspace    string
 		origin       string
 		isRemoteMode bool
-	)
 
-	params := map[string]string{}
+		cmd  string
+		name string
+	)
 
 	// parse flags
 	flag.StringVar(&workspace, "workspace", ".", "directory where to load to/save from")
@@ -31,109 +76,210 @@ func main() {
 	flag.BoolVar(&isRemoteMode, "r", false, "toggle remote mode")
 	flag.Parse()
 
-	// handle flag values
-	params["workspace"] = workspace
-	params["origin"] = origin
-
 	// handle arguments
 	amountOfParams := len(flag.Args())
 	if amountOfParams > 1 && amountOfParams < 3 {
-		params["cmd"] = flag.Arg(0)
-		params["name"] = flag.Arg(1)
+		cmd = flag.Arg(0)
+		name = flag.Arg(1)
 	} else {
 		fmt.Println("expected 2 (load/save, name) arguments to set but found:", amountOfParams)
 		os.Exit(1)
 	}
 
+	// create runtime config
+	runtime, err := parseArgs([]string{
+		workspace,
+		origin,
+		cmd,
+		name,
+	},
+		isRemoteMode,
+	)
+	if err != nil {
+		fmt.Printf("failed to parse arguments: %s\n", err)
+		os.Exit(1)
+	}
+
 	// load config to use as fall-back values
-	err := Load()
+	err = Load(defaultConfigFileName)
 	if err != nil {
 		fmt.Printf("failed to load configuration from file: %s\n", err)
 		os.Exit(1)
 	}
-	Cfg.Name = params["name"]
+	Cfg.Name = runtime.name
+
+	// unify all configuration and build app
+	app, err := buildApp(runtime, Cfg)
+	if err != nil {
+		fmt.Printf("failed to build app: %s\n", err)
+		os.Exit(1)
+	}
+
+	// run app
+	err = run(app, runtime)
+	if err != nil {
+		fmt.Printf("error occured while running app: %s", err)
+	}
+}
+
+func buildApp(runtimeCfg runtimeConfig, cfg Config) (App, error) {
 
 	var remote RemoteRepository
-	if isRemoteMode {
-		// for now also use github as default case (if no origin is set)
-		if strings.Contains(params["origin"], "github") {
+	if runtimeCfg.isRemoteMode {
 
-			repoOwner, repoName := splitGithubOriginIntoComponents(params["origin"])
-			Cfg.Github.RepoOwner = repoOwner
-			Cfg.Github.RepoName = repoName
+		if strings.Contains(runtimeCfg.origin, "github") {
 
-			var files []GithubDownloadedFile
-			remote = &GithubRepository{
-				DownloadResponse: &GithubDownloadResponse{
-					Files: files,
-				},
-				UploadBody: &GithubUploadBody{},
+			repoOwner, repoName := splitGithubOriginIntoComponents(runtimeCfg.origin)
+			cfg.Github.RepoOwner = repoOwner
+			cfg.Github.RepoName = repoName
+
+			remote = getGithubConfig()
+
+			err := validateGithubConfig(cfg)
+			if err != nil {
+				return App{}, err
 			}
-		} else if strings.Contains(params["origin"], "gitlab") {
 
-			projectId := splitGitlabOriginIntoComponents(params["origin"])
-			Cfg.Gitlab.ProjectId = projectId
+		} else if strings.Contains(runtimeCfg.origin, "gitlab") {
 
-			var files []GitlabDownloadedFile
-			remote = &GitlabRepository{
-				DownloadResponse: &GitlabDownloadResponse{
-					Files: files,
-				},
-				UploadBody: &GitlabUploadBody{},
+			projectId := splitGitlabOriginIntoComponents(runtimeCfg.origin)
+			cfg.Gitlab.ProjectId = projectId
+
+			remote = getGitlabConfig()
+
+			err := validateGitlabConfig(cfg)
+			if err != nil {
+				return App{}, err
 			}
-		} else if params["origin"] == "" && Cfg.Default == "github" {
 
-			var files []GithubDownloadedFile
-			remote = &GithubRepository{
-				DownloadResponse: &GithubDownloadResponse{
-					Files: files,
-				},
-				UploadBody: &GithubUploadBody{},
+		} else if runtimeCfg.origin == "" && cfg.Default == "github" {
+
+			remote = getGithubConfig()
+
+			err := validateGithubConfig(cfg)
+			if err != nil {
+				return App{}, err
 			}
-		} else if params["origins"] == "" && Cfg.Default == "gitlab" {
 
-			var files []GitlabDownloadedFile
-			remote = &GitlabRepository{
-				DownloadResponse: &GitlabDownloadResponse{
-					Files: files,
-				},
-				UploadBody: &GitlabUploadBody{},
+		} else if runtimeCfg.origin == "" && cfg.Default == "gitlab" {
+
+			remote = getGitlabConfig()
+
+			err := validateGitlabConfig(cfg)
+			if err != nil {
+				return App{}, err
 			}
 		} else {
-
-			fmt.Printf("found %s to be unknown source for remote origin\n", params["origin"])
-			os.Exit(1)
+			return App{}, fmt.Errorf("found %s to be unknown source for remote origin\n", runtimeCfg.origin)
 		}
 	}
 
 	app := App{
-		Workspace: params["workspace"],
-		Origin:    params["origin"],
-		Name:      params["name"],
-		DvcFolder: ".devcontainer",
-		Config:    Cfg,
+		Workspace: runtimeCfg.workspace,
+		Origin:    runtimeCfg.origin,
+		Name:      runtimeCfg.name,
+		DvcFolder: defaultFolderName,
+		Config:    cfg,
 		Remote:    remote,
 	}
 
-	switch params["cmd"] {
+	return app, nil
+}
+
+func getGithubConfig() *GithubRepository {
+
+	var files []GithubDownloadedFile
+	remote := &GithubRepository{
+		DownloadResponse: &GithubDownloadResponse{
+			Files: files,
+		},
+		UploadBody: &GithubUploadBody{},
+	}
+
+	return remote
+}
+
+func getGitlabConfig() *GitlabRepository {
+
+	var files []GitlabDownloadedFile
+	remote := &GitlabRepository{
+		DownloadResponse: &GitlabDownloadResponse{
+			Files: files,
+		},
+		UploadBody: &GitlabUploadBody{},
+	}
+
+	return remote
+}
+
+func parseArgs(args []string, isRemoteMode bool) (runtimeConfig, error) {
+
+	var runtime runtimeConfig
+
+	if len(args) != expectedArguments {
+
+		return runtime, fmt.Errorf("received unexpected number of arguments. expected %d but got %d", expectedArguments, len(args))
+	}
+
+	runtime.workspace = args[0]
+	runtime.origin = args[1]
+
+	runtime.isRemoteMode = isRemoteMode
+
+	err := runtime.verifyOrigin()
+	if err != nil {
+		return runtime, err
+	}
+
+	runtime.cmd = args[2]
+	err = runtime.verifyCmd()
+	if err != nil {
+		return runtime, err
+	}
+
+	runtime.name = args[3]
+
+	return runtime, nil
+}
+
+func run(app App, runtime runtimeConfig) error {
+
+	switch runtime.cmd {
 	case "load":
 		fmt.Printf("loading %s from %s to %s\n", app.Name, app.Origin, app.Workspace)
-		if isRemoteMode {
+		if runtime.isRemoteMode {
 			fmt.Println("loading from remote")
-			app.loadFromRemote()
+			err := app.loadFromRemote()
+			if err != nil {
+
+				return err
+			}
 		} else {
-			app.loadFromLocal()
+			err := app.loadFromLocal()
+			if err != nil {
+
+				return err
+			}
 		}
 	case "save":
 		fmt.Printf("saving from %s to %s as %s\n", app.Workspace, app.Origin, app.Name)
-		if isRemoteMode {
+		if runtime.isRemoteMode {
 			fmt.Println("saving to remote")
-			app.saveToRemote()
+			err := app.saveToRemote()
+			if err != nil {
+
+				return err
+			}
 		} else {
-			app.saveToLocal()
+			err := app.saveToLocal()
+			if err != nil {
+
+				return err
+			}
 		}
 	default:
-		fmt.Println("unknown command set: \n", params["cmd"])
-		os.Exit(1)
+		return fmt.Errorf("unknown command set: %s\n", runtime.cmd)
 	}
+
+	return nil
 }

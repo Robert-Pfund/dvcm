@@ -1,6 +1,10 @@
 # IDE specifics
 .vscode
+.idea
 
 # project specifics
 .devcontainer
 config.json
+
+# go specifics
+*.out
