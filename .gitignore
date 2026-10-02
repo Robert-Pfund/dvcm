@@ -5,3 +5,6 @@
 # project specifics
 .devcontainer
 config.json
+
+# go specifics
+*.out
