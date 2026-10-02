@@ -9,16 +9,16 @@ import (
 
 func TestGitlabRepository_UrlsAndMethod(t *testing.T) {
 	Cfg = Config{}
-	Cfg.Gitlab.ProjectId = "12345"
+	Cfg.Gitlab.ProjectId = "12345678"
 	Cfg.Name = "images"
 
 	repo := &GitlabRepository{}
 
-	if got, want := repo.getRepositoryInfoUrl(Cfg), "https://gitlab.com/api/v4/projects/12345/repository/tree?path=images"; got != want {
+	if got, want := repo.getRepositoryInfoUrl(Cfg), "https://gitlab.com/api/v4/projects/12345678/repository/tree?path=images"; got != want {
 		t.Fatalf("getRepositoryInfoUrl() = %q, want %q", got, want)
 	}
 
-	if got, want := repo.getRepositoryFileUrl(Cfg), "https://gitlab.com/api/v4/projects/12345/repository/files/images%2F"; got != want {
+	if got, want := repo.getRepositoryFileUrl(Cfg), "https://gitlab.com/api/v4/projects/12345678/repository/files/images%2F"; got != want {
 		t.Fatalf("getRepositoryFileUrl() = %q, want %q", got, want)
 	}
 
@@ -30,7 +30,7 @@ func TestGitlabRepository_UrlsAndMethod(t *testing.T) {
 func TestGitlabUploadBody_getJson(t *testing.T) {
 	Cfg = Config{}
 	Cfg.Gitlab.Branch = "main"
-	Cfg.Gitlab.ProjectId = "987"
+	Cfg.Gitlab.ProjectId = "12345678"
 
 	body := &GitlabUploadBody{}
 	body.setMessage("uploading file")
@@ -45,7 +45,7 @@ func TestGitlabUploadBody_getJson(t *testing.T) {
 	if !strings.Contains(got, `"branch":"main"`) {
 		t.Fatalf("JSON missing branch: %s", got)
 	}
-	if !strings.Contains(got, `"id":"987"`) {
+	if !strings.Contains(got, `"id":"12345678"`) {
 		t.Fatalf("JSON missing project id: %s", got)
 	}
 	if !strings.Contains(got, `"commit_message":"uploading file"`) {
